@@ -1,5 +1,4 @@
-function 480Banner()
-{
+function 480Banner() {
     $banner=@"
     _  _    ___   ___              _   _ _     
    | || |  ( _ ) / _ \       _   _| |_(_) |___ 
@@ -20,13 +19,12 @@ function 480Banner()
    \|||___||___|||/
    
 "@
-       Write-Host $banner
+    Write-Host $banner
 }
 
-function 480Connect([string] $server)
-{
+function 480Connect([string] $server) {
     $conn = $global:DefaultVIServer
-    if ($conn){
+    if ($conn) {
         $msg = "Already connected to {0}!" -f $conn
         Write-Host -ForegroundColor Green $msg
     } else {
@@ -34,42 +32,40 @@ function 480Connect([string] $server)
     }
 }
 
-function Get-480Config([string] $config_path)
-{
+function Get-480Config([string] $config_path) {
     Write-Host "Reading " $config_path
     $conf=$null
-    if (Test-Path $config_path)
-    {
+    if (Test-Path $config_path) {
         $conf = (Get-Content -Raw -Path $config_path | ConvertFrom-Json)
         $msg = "Using Configuration at {0}" -f $config_path
         Write-Host -ForegroundColor "Green" $msg
-    } else 
-    {
+    } else {
         Write-Host -ForegroundColor "Yellow" "No Configuration"
     }
     return $conf
-    
 }
 
-function Select-VM([string] $folder)
-{
+function Select-VM([string] $folder) {
     $selected_vm=$null
     try {
         $vms = Get-VM -Location $folder
+        if ($vms.Count -eq 0) {
+            Write-Host "No VMs found in folder '$folder'" -ForegroundColor Yellow
+            return $null
+        }
         $index = 1
-        foreach($vm in $vms)
-        {
-            Write-Host [$index] $vm.name
+        foreach($vm in $vms) {
+            Write-Host "[$index] $($vm.Name)"
             $index+=1
         }
         $pick_index = Read-Host "Which index number [x] do you wish to pick?"
-        $selected_vm = $vms[$pick_index -1]
-        Write-Host "You picked " $selected_vm.name
+        $selected_vm = $vms[$pick_index - 1]
+        Write-Host "You picked $($selected_vm.Name)"
         return $selected_vm
-        # Add something to validate selections i.e. can't pick VM 123123
     }
     catch {
-        Write-Host "Invalid folder: $folder" -ForegroundColor "Red"
+        Write-Host "Error: $_" -ForegroundColor Red
+        return $null
     }
 }
 
@@ -78,19 +74,166 @@ function New-LinkedClone {
         [string] $target,
         [string] $newname
     )
-  
+
+    $config = Get-480Config "/home/miles/Desktop/480/480.json"
+    try {
+        Connect-VIServer -Server $config.vcenter_server -ErrorAction Stop
+
+        $vm = Get-VM -Name $target -ErrorAction Stop
+        $snapshot = Get-Snapshot -VM $vm -Name "Base" -ErrorAction Stop
+        $vmhost = Get-VMHost -Name $config.ip -ErrorAction Stop
+        $ds = Get-Datastore -Name $config.dsname -ErrorAction Stop
+
+        $linkedclone = "{0}.linked" -f $vm.Name
+        $linkedvm = New-VM -LinkedClone -Name $linkedclone -VM $vm -ReferenceSnapshot $snapshot -VMHost $vmhost -Datastore $ds -ErrorAction Stop
+        $newvm = New-VM -Name $newname -VM $linkedvm -VMHost $vmhost -Datastore $ds -Location $config.vm_folder -ErrorAction Stop
+        $newvm | New-Snapshot -Name "Base" -ErrorAction Stop
+        $linkedvm | Remove-VM -Confirm:$false -ErrorAction Stop
+
+        $networkAdapter = $newvm | Get-NetworkAdapter -ErrorAction Stop
+        $networkAdapter | Set-NetworkAdapter -NetworkName $config.adapter -ErrorAction Stop
+
+        Write-Host "Linked clone created and moved to $destinationFolder folder successfully."
+    }
+    catch {
+        Write-Host "Error: $_" -ForegroundColor Red
+    }
+    finally {
+        Disconnect-VIServer -Confirm:$false -ErrorAction SilentlyContinue
+    }
+}
+
+function Switch-Network {
+    param (
+        [string] $vmName
+    )
+
+    $config = Get-480Config "/home/miles/Desktop/480/480.json"
+    Connect-VIServer -Server $config.vcenter_server
+
+    $vm = Get-VM -Name $vmName
+
+    if ($vm) {
+        $networkAdapters = $vm | Get-NetworkAdapter
+
+        if ($networkAdapters) {
+            Write-Host "Available Network Adapters for VM $vmName"
+            $index = 1
+            foreach ($adapter in $networkAdapters) {
+                Write-Host "[$index] $($adapter.Name)"
+                $index++
+            }
+
+            $adapterIndex = Read-Host "Select the network adapter index to modify"
+            $selectedAdapter = $networkAdapters[$adapterIndex - 1]
+
+            $networks = Get-VirtualNetwork
+            Write-Host "Available Networks:"
+            $index = 1
+            foreach ($network in $networks) {
+                Write-Host "[$index] $($network.Name)"
+                $index++
+            }
+
+            $networkIndex = Read-Host "Select the network index to assign to the adapter"
+            $selectedNetwork = $networks[$networkIndex - 1]
+
+            $selectedAdapter | Set-NetworkAdapter -NetworkName $selectedNetwork.Name -Confirm:$false
+            Write-Host "Network adapter updated successfully."
+        } else {
+            Write-Host "Error: No network adapters found for VM $vmName." -ForegroundColor Red
+        }
+    } else {
+        Write-Host "Error: VM $vmName not found." -ForegroundColor Red
+    }
+}
+
+function Get-IP {
+    param(
+        [string] $vmName
+    )
+
+    $config = Get-480Config "/home/miles/Desktop/480/480.json"
+    Connect-VIServer -Server $config.vcenter_server
+
+    $vm = Get-VM -Name $vmName
+
+    if ($vm) {
+        $networkAdapter = $vm | Get-NetworkAdapter | Select-Object -First 1
+
+        if ($networkAdapter) {
+            $macAddress = $networkAdapter.MacAddress
+            $ipAddress = $vm.guest.ipAddress[0]  # Assuming first IP address
+
+            [PSCustomObject]@{
+                VMName = $vm.Name
+                IPAddress = $ipAddress
+                MACAddress = $macAddress
+            }
+        } else {
+            Write-Host "Error: No network adapter found for VM $vmName" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "Error: VM $vmName not found" -ForegroundColor Red
+    }
+}
+function Show-Menu {
+    param (
+        [string] $folder,
+        [string] $selectedVM
+    )
+
+    Write-Host "Selected VM: $selectedVM"
+    Write-Host "[1] Create Linked Clone"
+    Write-Host "[2] Power On VM"
+    Write-Host "[3] Power Off VM"
+    Write-Host "[4] Change Network"
+    Write-Host "[5] Get Network Info"
+    Write-Host "[6] Exit"
+
+    $choice = Read-Host "Enter your choice by index number [x]"
+
+    switch ($choice) {
+        1 {
+            New-LinkedClone -target $selectedVM -newname "NewClone_$selectedVM"
+        }
+        2 {
+            Start-VM -VM $selectedVM
+        }
+        3 {
+            Stop-VM -VM $selectedVM
+        }
+        4 {
+            Switch-Network -vmName $selectedVM
+        }
+        5 {
+            Get-IP -vmName $selectedVM
+        }
+        6 { exit }
+        default { Write-Host "Invalid choice" }
+    }
+}
+
+function Main {
+    Clear-Host
+    480Banner
     $config = Get-480Config "/home/miles/Desktop/480/480.json"
 
-    Connect-VIServer -Server $config.vcenter_server
-    $vm = Get-VM -Name $target
-    $snapshot = Get-Snapshot -VM $vm -Name "Base"
-    $vmhost = Get-VMHost -Name $config.ip
-    $ds = Get-Datastore -Name $config.dsname
-    $linkedclone = "{0}.linked" -f $vm.name
-    $linkedvm = New-VM -LinkedClone -Name $linkedclone -VM $vm -ReferenceSnapshot $snapshot -VMHost $vmhost -Datastore $ds
-    $newvm = New-VM -Name $newname -VM $linkedvm -VMHost $vmhost -Datastore $ds -Location $config.vm_folder
-    $newvm | New-Snapshot -Name "Base"
-    $linkedvm | Remove-VM -Confirm:$false
-    $newvm | Get-NetworkAdapter | Set-NetworkAdapter -NetworkName $config.adapter
-    Write-Host "Done."
+    if (-not $config) {
+        Write-Host "Error: Configuration not found" -ForegroundColor Red
+        return
+    }
+
+    $folderChoice = Read-Host "Choose folder (BASE or PROD)"
+    $folder = if ($folderChoice.ToLower() -eq "base") { $config.base_folder } elseif ($folderChoice.ToLower() -eq "prod") { $config.prod_folder } else { Write-Host "Invalid folder choice"; return }
+
+    $vms = Get-VM -Location $folder
+
+    if ($vms) {
+        Write-Host "Available VMs in folder '$folder':"
+        $selectedVM = Select-VM $folder
+        Show-Menu -folder $folder -selectedVM $selectedVM.Name
+    } else {
+        Write-Host "No VMs found in folder '$folder'" -ForegroundColor Yellow
+    }
 }

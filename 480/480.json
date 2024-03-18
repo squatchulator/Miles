@@ -1,6 +1,7 @@
 {
     "vcenter_server" : "vcenter.miles.local",
-    "vm_folder" : "BASEVM",
+    "base_folder" : "BASEVM",
+    "prod_folder" : "PROD",
     "ip": "192.168.7.15",
     "dsname": "datastore1-super5",
     "adapter": "480-WAN"
