@@ -23,6 +23,7 @@ function 480Banner() {
 }
 
 function 480Connect([string] $server) {
+    Write-Host "Server value received: $server"
     $conn = $global:DefaultVIServer
     if ($conn) {
         $msg = "Already connected to {0}!" -f $conn
@@ -90,16 +91,56 @@ function New-LinkedClone {
         $newvm | New-Snapshot -Name "Base" -ErrorAction Stop
         $linkedvm | Remove-VM -Confirm:$false -ErrorAction Stop
 
-        $networkAdapter = $newvm | Get-NetworkAdapter -ErrorAction Stop
-        $networkAdapter | Set-NetworkAdapter -NetworkName $config.adapter -ErrorAction Stop
+        $networkAdapters = $newvm | Get-NetworkAdapter -ErrorAction Stop
 
-        Write-Host "Linked clone created and moved to $destinationFolder folder successfully."
+        foreach ($adapter in $networkAdapters) {
+            Write-Host "Configuring network adapter $($adapter.Name)"
+            $networks = Get-VirtualNetwork
+            Write-Host "Available Networks for adapter $($adapter.Name):"
+            $index = 1
+            foreach ($network in $networks) {
+                Write-Host "[$index] $($network.Name)"
+                $index++
+            }
+
+            $networkIndex = Read-Host "Select the network index to assign to the adapter $($adapter.Name)"
+            $selectedNetwork = $networks[$networkIndex - 1]
+
+            $adapter | Set-NetworkAdapter -NetworkName $selectedNetwork.Name -Confirm:$false -ErrorAction Stop
+        }
+
+        Write-Host "Linked clone created successfully."
     }
     catch {
         Write-Host "Error: $_" -ForegroundColor Red
     }
     finally {
         Disconnect-VIServer -Confirm:$false -ErrorAction SilentlyContinue
+    }
+}
+
+
+function New-Network {
+    param(
+        [string] $newswitch,
+        [string] $newportgroup
+    )
+    $config = Get-480Config "/home/miles/Desktop/480/480.json"
+    Connect-VIServer -Server $config.vcenter_server
+    $vmhost = Get-VMHost -Name $config.ip
+
+    New-VirtualSwitch -VMHost $vmhost -Name $newswitch
+    $switch = Get-VirtualSwitch -VMHost $vmhost -Name $newswitch
+    New-VirtualPortGroup -VirtualSwitch $switch -Name $newportgroup
+    $portgroupInfo = Get-VirtualPortGroup -VirtualSwitch $switch -Name $newportgroup
+
+    if ($switch -and $portgroupInfo) {
+        Write-Host "New virtual switch created:"
+        $switch | Format-Table -AutoSize
+        Write-Host "New port group created on virtual switch $newswitch"
+        $portgroupInfo | Format-Table -AutoSize
+    } else {
+        Write-Host "Error: Failed to get information about the created network."
     }
 }
 
@@ -188,8 +229,9 @@ function Show-Menu {
     Write-Host "[2] Power On VM"
     Write-Host "[3] Power Off VM"
     Write-Host "[4] Change Network"
-    Write-Host "[5] Get Network Info"
-    Write-Host "[6] Exit"
+    Write-Host "[5] New Network"
+    Write-Host "[6] Get Network Info"
+    Write-Host "[7] Exit"
 
     $choice = Read-Host "Enter your choice by index number [x]"
 
@@ -207,9 +249,14 @@ function Show-Menu {
             Switch-Network -vmName $selectedVM
         }
         5 {
+            $newswitch = Read-Host "Enter the name of the new switch"
+            $newportgroup = Read-Host "Enter the name of the new port group"
+            New-Network -newswitch $newswitch -newportgroup $newportgroup
+        }
+        6 {
             Get-IP -vmName $selectedVM
         }
-        6 { exit }
+        7 { exit }
         default { Write-Host "Invalid choice" }
     }
 }
@@ -218,7 +265,7 @@ function Main {
     Clear-Host
     480Banner
     $config = Get-480Config "/home/miles/Desktop/480/480.json"
-
+    480Connect
     if (-not $config) {
         Write-Host "Error: Configuration not found" -ForegroundColor Red
         return
