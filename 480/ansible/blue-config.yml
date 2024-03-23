@@ -1,0 +1,23 @@
+---
+- name: Configure DHCP Server on Blue FW
+  hosts: vyos
+  tasks:
+    - name: Get VyOS Version Info
+      vyos_command:
+        commands: show version
+      register: version
+    - debug:
+       var: version.stdout_lines
+
+    - name: DHCP Server for blue-lan
+      vyos_config:
+        save: yes
+        lines:
+        - set service dhcp-server global-parameters "local-address {{ lan_ip }};"
+        - set service dhcp-server shared-network-name {{ shared_network }} authoritative
+        - set service dhcp-server shared-network-name {{ shared_network }} subnet {{ lan }} default-router '{{ lan_ip }}'
+        - set service dhcp-server shared-network-name {{ shared_network }} subnet {{ lan }} domain-name '{{ dhcp_domain }}'
+        - set service dhcp-server shared-network-name {{ shared_network }} subnet {{ lan }} lease '86400'
+        - set service dhcp-server shared-network-name {{ shared_network }} subnet {{ lan }} name-server '{{ dhcp_name_server }}'
+        - set service dhcp-server shared-network-name {{ shared_network }} subnet {{ lan }} range {{ shared_network }} start '10.0.5.75'
+        - set service dhcp-server shared-network-name {{ shared_network }} subnet {{ lan }} range {{ shared_network }} stop '10.0.5.125'

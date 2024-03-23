@@ -204,7 +204,7 @@ function Get-IP {
 
         if ($networkAdapter) {
             $macAddress = $networkAdapter.MacAddress
-            $ipAddress = $vm.guest.ipAddress[0]  # Assuming first IP address
+            $ipAddress = $vm.guest.ipAddress[0] 
 
             [PSCustomObject]@{
                 VMName = $vm.Name
