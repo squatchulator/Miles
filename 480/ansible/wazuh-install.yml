@@ -1,0 +1,26 @@
+- name: Wazuh Configuration
+  hosts: wazuh_servers
+  tasks:
+    - name: Downloading The Wazuh Server Script
+      ansible.builtin.shell:
+        chdir: /home/{{ ansible_user }}/
+        cmd: curl -sO https://packages.wazuh.com/4.3/wazuh-install.sh
+    - name: Allow port 443, 1514, 1515, 55000 through firewalld
+      become: yes
+      shell: firewall-cmd --permanent --add-port=443/tcp && firewall-cmd --permanent --add-port=1514/tcp && firewall-cmd --permanent --add-port=1515/tcp && firewall-cmd --permanent --add-port=55000/tcp && firewall-cmd --reload
+    - name: Run Wazuh Server Script
+      become: yes
+      ansible.builtin.shell:
+        cmd: bash ./wazuh-install.sh -a -i
+        chdir: /home/{{ ansible_user }}/
+    - name: Start and Enable Wazuh Indexer
+      shell: systemctl enable wazuh-indexer-performance-analyzer && systemctl start wazuh-indexer-performance-analyzer
+      become: true
+    - name: Output Password
+      shell: tar -O -xvf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt
+      become: true
+    - name: Bounce The Box
+      shell: "sleep 5 && restart -r"
+      become: yes
+      async: 1
+      poll: 0

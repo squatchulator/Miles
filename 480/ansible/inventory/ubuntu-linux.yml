@@ -1,0 +1,23 @@
+linux:
+  hosts:
+  children:
+    ubuntu:
+      hosts:
+        10.0.5.78:
+          hostname: UbuntuClone-1
+          lan_ip: 10.0.5.13
+        10.0.5.79:
+          hostname: UbuntuClone-2
+          lan_ip: 10.0.5.14
+        10.0.5.80: #SIEM Deployment for Milestone 8
+          hostname: Strawberry-01
+          lan_ip: 10.0.5.15
+      vars:
+        device: ens160
+  vars:
+    ansible_user: deployer
+    public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDhnfOlwnT4954wgtgE1M01cgposqKF6wl/o2yPtseyzDrq4Hhy070nFlmYatq6wlbhB8+qb+shGHDk/4ExTiGAP2BTgSUgNNFyaBM23gBMAdWhVWuUPQzrrbaXwFPnUi2reUBivJT6PvMGPZ1UVdwRDpNMV0qdw7aWS/CL8gZCjrr1XAf3CtR4IoRY0a6cNc/UmztnoszU+daGUGhmuPIcWgHNm6vkPz16/YFdKvOHOA7HIM3PQ6Pikd7TkGS27L9KjNogYD+mSq0JGSnPFqD8qa47koJjKrrHyM3J8VTcwO3CQIeVbwb4dEyhrIxud6creOKGUcjR1tU8EwBsbxtK3mGbPV6TtWwCDvr5IYrI5ogafCd7BuIgZ1nJFOtUKBigtcFL7ErFssdZ7VNOeoQCqyyFO+nlKg772i91T32U+g5rJbbb6+HEl8peTvY2y8Ge5BS3xn6u6Fu4pRhapWYOFvPi88W43Lr7pT1j6o07pmlvM/xeU/tyO31N8w8Wl8s= miles@xubuntu-wan"
+    prefix: 24
+    gateway: 10.0.5.2
+    name_server: 10.0.5.5
+    domian: blue1.local

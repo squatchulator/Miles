@@ -1,0 +1,19 @@
+linux:
+  hosts:
+  children:
+    centos:
+      hosts:
+        10.0.5.83:
+          hostname: Wazuh-01
+        10.0.5.84:
+          hostname: Mon-01
+      vars:
+        device: ens192
+
+  vars:
+    public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDhnfOlwnT4954wgtgE1M01cgposqKF6wl/o2yPtseyzDrq4Hhy070nFlmYatq6wlbhB8+qb+shGHDk/4ExTiGAP2BTgSUgNNFyaBM23gBMAdWhVWuUPQzrrbaXwFPnUi2reUBivJT6PvMGPZ1UVdwRDpNMV0qdw7aWS/CL8gZCjrr1XAf3CtR4IoRY0a6cNc/UmztnoszU+daGUGhmuPIcWgHNm6vkPz16/YFdKvOHOA7HIM3PQ6Pikd7TkGS27L9KjNogYD+mSq0JGSnPFqD8qa47koJjKrrHyM3J8VTcwO3CQIeVbwb4dEyhrIxud6creOKGUcjR1tU8EwBsbxtK3mGbPV6TtWwCDvr5IYrI5ogafCd7BuIgZ1nJFOtUKBigtcFL7ErFssdZ7VNOeoQCqyyFO+nlKg772i91T32U+g5rJbbb6+HEl8peTvY2y8Ge5BS3xn6u6Fu4pRhapWYOFvPi88W43Lr7pT1j6o07pmlvM/xeU/tyO31N8w8Wl8s= miles@xubuntu-wan"
+    ansible_user: deployer
+    prefix: 24
+    gateway: 10.0.5.2
+    name_server: 1.1.1.1
+    domian: blue1.local

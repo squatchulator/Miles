@@ -197,9 +197,9 @@ function Get-IP {
     $config = Get-480Config "/home/miles/Desktop/480/480.json"
     Connect-VIServer -Server $config.vcenter_server
 
-    $vm = Get-VM -Name $vmName
+    $vms = Get-VM -Name $vmName
 
-    if ($vm) {
+    foreach ($vm in $vms) {
         $networkAdapter = $vm | Get-NetworkAdapter | Select-Object -First 1
 
         if ($networkAdapter) {
@@ -212,12 +212,11 @@ function Get-IP {
                 MACAddress = $macAddress
             }
         } else {
-            Write-Host "Error: No network adapter found for VM $vmName" -ForegroundColor Red
+            Write-Host "Error: No network adapter found for VM $($vm.Name)" -ForegroundColor Red
         }
-    } else {
-        Write-Host "Error: VM $vmName not found" -ForegroundColor Red
     }
 }
+
 function Show-Menu {
     param (
         [string] $folder,
