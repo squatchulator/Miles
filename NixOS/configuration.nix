@@ -90,6 +90,7 @@
       gitkraken
       spotify
       steam
+      obs-studio
       home-manager
       thc-hydra
       nmap
