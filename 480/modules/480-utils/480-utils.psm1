@@ -84,9 +84,11 @@ function New-LinkedClone {
         $snapshot = Get-Snapshot -VM $vm -Name "Base" -ErrorAction Stop
         $vmhost = Get-VMHost -Name $config.ip -ErrorAction Stop
         $ds = Get-Datastore -Name $config.dsname -ErrorAction Stop
-
         $linkedclone = "{0}.linked" -f $vm.Name
         $linkedvm = New-VM -LinkedClone -Name $linkedclone -VM $vm -ReferenceSnapshot $snapshot -VMHost $vmhost -Datastore $ds -ErrorAction Stop
+        $newname = Read-Host "Enter a name for the new VM"
+
+
         $newvm = New-VM -Name $newname -VM $linkedvm -VMHost $vmhost -Datastore $ds -Location $config.vm_folder -ErrorAction Stop
         $newvm | New-Snapshot -Name "Base" -ErrorAction Stop
         $linkedvm | Remove-VM -Confirm:$false -ErrorAction Stop
@@ -110,6 +112,21 @@ function New-LinkedClone {
         }
 
         Write-Host "Linked clone created successfully."
+
+        $folders = Get-Folder
+        Write-Host "Available folders:"
+        $index = 1
+        foreach ($folder in $folders) {
+            Write-Host "[$index] $($folder.Name)"
+            $index++
+        }
+
+        $folderIndex = Read-Host "Select the folder index to move the new VM"
+        $selectedFolder = $folders[$folderIndex - 1]
+
+        Move-VM -VM $newvm -Destination $selectedFolder -Confirm:$false
+
+        Write-Host "New VM moved to folder $($selectedFolder.Name)."
     }
     catch {
         Write-Host "Error: $_" -ForegroundColor Red
@@ -118,6 +135,7 @@ function New-LinkedClone {
         Disconnect-VIServer -Confirm:$false -ErrorAction SilentlyContinue
     }
 }
+
 
 
 function New-Network {
@@ -217,6 +235,31 @@ function Get-IP {
     }
 }
 
+function Set-StaticIP {
+    param(
+        [string] $vmName
+    )
+
+    $password = Read-Host "Passowrd for deployer user: " -AsSecureString
+    $ipAddress = Read-Host "Enter the IP address"
+    $subnetMask = Read-Host "Enter the subnet mask"
+    $dnsPrimary = Read-Host "Enter the primary DNS server"
+    $dnsAlternate = Read-Host "Enter the alternate DNS server"
+    $gateway = Read-Host "Enter the default gateway"
+
+    # Got some help from David on this one, apparently WSMan is required for this and we don't have access to those libraries.
+    # A working solution he showed me is to use the Invoke-VMScript function rather than Invoke-Command to pass commands.
+    $setAddr = "netsh interface ipv4 set address Ethernet0 static $ipAddress $subnetMask $gateway"
+    $setDnsP = "netsh interface ipv4 add dnsserver Ethernet0 address=$dnsPrimary index=1"
+    $setDnsA = "netsh interface ipv4 add dnsserver Ethernet0 address=$dnsAlternate index=2"
+
+    
+    Invoke-VMScript -ScriptText $setAddr -VM $vmName -GuestUser deployer -GuestPassword $password
+    Invoke-VMScript -ScriptText $setDnsP -VM $vmName -GuestUser deployer -GuestPassword $password
+    Invoke-VMScript -ScriptText $setDnsA -VM $vmName -GuestUser deployer -GuestPassword $password
+}
+
+
 function Show-Menu {
     param (
         [string] $folder,
@@ -230,7 +273,8 @@ function Show-Menu {
     Write-Host "[4] Change Network"
     Write-Host "[5] New Network"
     Write-Host "[6] Get Network Info"
-    Write-Host "[7] Exit"
+    Write-Host "[7] Set Static Network Configuration"
+    Write-Host "[8] Exit"
 
     $choice = Read-Host "Enter your choice by index number [x]"
 
@@ -255,7 +299,10 @@ function Show-Menu {
         6 {
             Get-IP -vmName $selectedVM
         }
-        7 { exit }
+        7 {
+            Set-StaticIP -vmName $selectedVM
+        }
+        8 { exit }
         default { Write-Host "Invalid choice" }
     }
 }
