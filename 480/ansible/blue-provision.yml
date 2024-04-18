@@ -1,0 +1,57 @@
+---
+- name: windows server provisioning
+  hosts: servers
+  vars_prompt:
+    - name: ansible_dc_password
+      prompt: "Enter local admin password"
+      private: yes
+
+  tasks:
+    - name: change admin user password
+      ansible.windows.win_shell: |
+        net user Administrator "{{ ansible_dc_password }}"
+
+    - name: set new hostname
+      ansible.windows.win_hostname:
+        name: dc-blue1
+
+    - name: create blue.local domain
+      ansible.windows.win_domain:
+        hostname: dc-blue1
+        domain_name: blue.local
+        dns_domain_name: blue.local
+        safe_mode_password: "{{ ansible_dc_password }}"
+        
+    - name: force reboot
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+
+    - name: add dns forwarder
+      ansible.windows.win_shell: Add-DnsServerForwarder -IPAddress 1.1.1.1
+
+    - name: promote to domain controller
+      ansible.windows.win_domain_controller:
+        dns_domain_name: blue.local
+        domain_log_path: 'C:\\Windows\\NTDS'
+        domain_admin_password: "{{ ansible_dc_password }}"
+        safe_mode_password: "{{ ansible_dc_password }}"
+        domain_admin_user: blue.local\\Administrator
+        local_admin_password: "{{ ansible_dc_password }}"
+        sysvol_path: 'C:\\Windows\\SYSVOL'
+        install_dns: yes
+        state: domain_controller
+        read_only: no
+        site_name: Default-First-Site-Name
+
+    - name: build ou structure
+      ansible.windows.win_shell: |
+        New-ADOrganizationalUnit -Name "Accounts" -Path "DC=BLUE,DC=local"
+        New-ADOrganizationalUnit -Name "Groups" -Path "DC=BLUE,DC=local"
+        New-ADOrganizationalUnit -Name "Computers" -Path "DC=BLUE,DC=local"
+        New-ADOrganizationalUnit -Name "Servers" -Path "DC=BLUE,DC=local"
+        New-ADOrganizationalUnit -Name "Workstations" -Path "DC=BLUE,DC=local"
+        New-ADOrganizationalUnit -Name "Blue" -Path "DC=BLUE,DC=local"
+
+    - name: force reboot
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
