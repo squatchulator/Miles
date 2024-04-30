@@ -28,30 +28,21 @@ def decrypt_file(file_path, key):
     
     os.remove(file_path)
 
-def encrypt_folder(folder_path, key):
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            file_path = os.path.join(root, file)
-            encrypt_file(file_path, key)
-
-def decrypt_folder(folder_path, key):
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if file.endswith('.encrypted'):
-                file_path = os.path.join(root, file)
-                decrypt_file(file_path, key)
-
 def main():
     password = input("Enter password: ")
     key = generate_key(password.encode())
     
     action = input("Enter 'encrypt' or 'decrypt' to choose action: ")
     if action.lower() == 'encrypt':
-        encrypt_folder('.', key)
-        print("Files and folders encrypted successfully.")
+        files = [f for f in os.listdir('.') if os.path.isfile(f) and f != os.path.basename(__file__) and not f.endswith('.encrypted')]
+        for file in files:
+            encrypt_file(file, key)
+        print("Files encrypted successfully.")
     elif action.lower() == 'decrypt':
-        decrypt_folder('.', key)
-        print("Files and folders decrypted successfully.")
+        files = [f for f in os.listdir('.') if os.path.isfile(f) and f.endswith('.encrypted')]
+        for file in files:
+            decrypt_file(file, key)
+        print("Files decrypted successfully.")
     else:
         print("Invalid action.")
 
