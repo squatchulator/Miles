@@ -34,17 +34,13 @@ def main():
     
     action = input("Enter 'encrypt' or 'decrypt' to choose action: ")
     if action.lower() == 'encrypt':
-        files = [f for f in os.listdir('.') if os.path.isfile(f)]
+        files = [f for f in os.listdir('.') if os.path.isfile(f) and f != os.path.basename(__file__) and not f.endswith('.encrypted')]
         for file in files:
-            if file.endswith('.encrypted'):
-                continue
             encrypt_file(file, key)
         print("Files encrypted successfully.")
     elif action.lower() == 'decrypt':
-        files = [f for f in os.listdir('.') if os.path.isfile(f)]
+        files = [f for f in os.listdir('.') if os.path.isfile(f) and f.endswith('.encrypted')]
         for file in files:
-            if not file.endswith('.encrypted'):
-                continue
             decrypt_file(file, key)
         print("Files decrypted successfully.")
     else:
